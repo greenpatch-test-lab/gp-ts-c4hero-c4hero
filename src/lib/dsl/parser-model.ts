@@ -27,7 +27,12 @@ type Element = Person | SoftwareSystem | Container | Component
 function applyStructurizrConventions(element: Element): void {
     if (element.type === 'person' || element.type === 'softwareSystem') {
         const location = element.properties['c4hero.location']
-        if (element.location === undefined && (location === 'External' || location === 'Internal')) {
+        // With `!` lines in its properties block, c4hero writes every location
+        // as this property, Unspecified included, to override an include
+        // (TEA-351). Elsewhere Unspecified stays a plain property.
+        const written = location === 'External' || location === 'Internal' || (location === 'Unspecified'
+            && element.propertyLayout?.declarations.some(d => d.key === 'c4hero.location'))
+        if (element.location === undefined && written) {
             element.location = location
             delete element.properties['c4hero.location']
         }
@@ -38,9 +43,8 @@ function applyStructurizrConventions(element: Element): void {
         // contradiction in the field's favour and does not re-emit the tag
         // (see locationAwareTags) — emitting it would flip the element to
         // External on the next parse.
-        // Known consequence of the hoist: canvas styles keyed on the
-        // "External" tag no longer match (style lookup reads tags only, not
-        // location) — tracked as TEA-168.
+        // Canvas styles keyed on the "External" tag still match after the
+        // hoist: getElementStyle reads `location` as an implicit tag (TEA-168).
         if (i !== -1 && element.location === undefined) {
             element.location = 'External'
             element.tags.splice(i, 1)
